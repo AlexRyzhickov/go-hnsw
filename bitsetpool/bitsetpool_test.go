@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/willf/bitset"
+	"github.com/bits-and-blooms/bitset"
 )
 
 func TestBitset(t *testing.T) {
@@ -38,7 +38,7 @@ func TestBitset(t *testing.T) {
 	t.Logf("bitset done in %v", stop.Seconds())
 
 	start3 := time.Now()
-	pool := NewBitsetPool()
+	pool := New()
 	for j := 0; j < 100000; j++ {
 		id, b := pool.Get()
 		for i := 0; i < 100; i++ {

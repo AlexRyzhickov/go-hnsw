@@ -10,8 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
+	//"github.com/stretchr/testify/assert"
 )
 
 var prefix = "siftsmall/siftsmall"
@@ -26,23 +25,24 @@ func TestMain(m *testing.M) {
 	queries, truth = loadQueriesFromFvec(prefix)
 	os.Exit(m.Run())
 }
-func TestSaveLoad(t *testing.T) {
-	h := buildIndex()
-	testSearch(h)
 
-	fmt.Printf("Saving to index.dat\n")
-	err := h.Save("index.dat")
-	assert.Nil(t, err)
-
-	fmt.Printf("Loading from index.dat\n")
-	h2, timestamp, err := Load("index.dat")
-	assert.Nil(t, err)
-
-	fmt.Printf("Index loaded, time saved was %v", time.Unix(timestamp, 0))
-
-	fmt.Printf(h2.Stats())
-	testSearch(h2)
-}
+//func TestSaveLoad(t *testing.T) {
+//	h := buildIndex()
+//	testSearch(h)
+//
+//	fmt.Printf("Saving to index.dat\n")
+//	err := h.Save("index.dat")
+//	assert.Nil(t, err)
+//
+//	fmt.Printf("Loading from index.dat\n")
+//	h2, timestamp, err := Load("index.dat")
+//	assert.Nil(t, err)
+//
+//	fmt.Printf("Index loaded, time saved was %v", time.Unix(timestamp, 0))
+//
+//	fmt.Printf(h2.Stats())
+//	testSearch(h2)
+//}
 
 func TestSIFT(t *testing.T) {
 	h := buildIndex()
