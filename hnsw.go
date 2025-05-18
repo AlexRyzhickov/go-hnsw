@@ -18,8 +18,8 @@ import (
 
 type Point []float32
 
-func (a Point) Size() int {
-	return len(a) * 4
+func (p Point) Size() int {
+	return len(p) * 4
 }
 
 type node struct {
