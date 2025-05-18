@@ -419,6 +419,14 @@ func (h *Hnsw) Grow(size int) {
 	h.nodes = newNodes
 }
 
+func randomLevel(levelMult float64) int {
+	r := rand.Float64()
+	if r == 0 {
+		r = 1e-10
+	}
+	return int(math.Floor(-math.Log(r * levelMult)))
+}
+
 func (h *Hnsw) Add(q Point, id uint32) {
 
 	if id == 0 {
@@ -426,7 +434,7 @@ func (h *Hnsw) Add(q Point, id uint32) {
 	}
 
 	// generate random level
-	curLevel := int(math.Floor(-math.Log(rand.Float64() * h.LevelMult)))
+	curLevel := randomLevel(h.LevelMult)
 
 	epID := h.enterpoint
 	curMaxLevel := h.nodes[epID].level
