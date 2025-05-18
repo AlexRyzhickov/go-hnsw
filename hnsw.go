@@ -45,7 +45,7 @@ type Hnsw struct {
 	bitset *bitsetpool.BitsetPool
 
 	LevelMult  float64
-	maxLayer   int
+	maxLevel   int
 	enterpoint uint32
 }
 
@@ -69,7 +69,7 @@ func Load(filename string) (*Hnsw, int64, error) {
 	h.linkMode = readInt32(z)
 	h.DelaunayType = readInt32(z)
 	h.LevelMult = readFloat64(z)
-	h.maxLayer = readInt32(z)
+	h.maxLevel = readInt32(z)
 	h.enterpoint = uint32(readInt32(z))
 
 	h.DistFunc = f32.L2Squared8AVX
@@ -127,7 +127,7 @@ func (h *Hnsw) Save(filename string) error {
 	writeInt32(h.linkMode, z)
 	writeInt32(h.DelaunayType, z)
 	writeFloat64(h.LevelMult, z)
-	writeInt32(h.maxLayer, z)
+	writeInt32(h.maxLevel, z)
 	writeInt32(int(h.enterpoint), z)
 
 	l := len(h.nodes)
@@ -383,12 +383,12 @@ func (h *Hnsw) Stats() string {
 	s = s + fmt.Sprintf("M: %v, efConstruction: %v\n", h.M, h.efConstruction)
 	s = s + fmt.Sprintf("DelaunayType: %v\n", h.DelaunayType)
 	s = s + fmt.Sprintf("Number of nodes: %v\n", len(h.nodes))
-	s = s + fmt.Sprintf("Max layer: %v\n", h.maxLayer)
+	s = s + fmt.Sprintf("Max level: %v\n", h.maxLevel)
 	memoryUseData := 0
 	memoryUseIndex := 0
-	levCount := make([]int, h.maxLayer+1)
-	conns := make([]int, h.maxLayer+1)
-	connsC := make([]int, h.maxLayer+1)
+	levCount := make([]int, h.maxLevel+1)
+	conns := make([]int, h.maxLevel+1)
+	connsC := make([]int, h.maxLevel+1)
 	for i := range h.nodes {
 		levCount[h.nodes[i].level]++
 		for j := 0; j <= h.nodes[i].level; j++ {
@@ -417,7 +417,6 @@ func (h *Hnsw) Grow(size int) {
 	newNodes := make([]node, len(h.nodes), size+1)
 	copy(newNodes, h.nodes)
 	h.nodes = newNodes
-
 }
 
 func (h *Hnsw) Add(q Point, id uint32) {
@@ -427,18 +426,18 @@ func (h *Hnsw) Add(q Point, id uint32) {
 	}
 
 	// generate random level
-	curlevel := int(math.Floor(-math.Log(rand.Float64() * h.LevelMult)))
+	curLevel := int(math.Floor(-math.Log(rand.Float64() * h.LevelMult)))
 
 	epID := h.enterpoint
-	currentMaxLayer := h.nodes[epID].level
+	curMaxLevel := h.nodes[epID].level
 	ep := &distqueue.Item{ID: h.enterpoint, D: h.DistFunc(h.nodes[h.enterpoint].p, q)}
 
 	// assume Grow has been called in advance
 	newID := id
-	newNode := node{p: q, level: curlevel, friends: make([][]uint32, min(curlevel, currentMaxLayer)+1)}
+	newNode := node{p: q, level: curLevel, friends: make([][]uint32, min(curLevel, curMaxLevel)+1)}
 
-	// first pass, find another ep if curlevel < maxLayer
-	for level := currentMaxLayer; level > curlevel; level-- {
+	// first pass, find another ep if curLevel < curMaxLevel
+	for level := curMaxLevel; level > curLevel; level-- {
 		changed := true
 		for changed {
 			changed = false
@@ -455,13 +454,13 @@ func (h *Hnsw) Add(q Point, id uint32) {
 	// second pass, ef = efConstruction
 	// loop through every level from the new nodes level down to level 0
 	// create new connections in every layer
-	for level := min(curlevel, currentMaxLayer); level >= 0; level-- {
+	for level := min(curLevel, curMaxLevel); level >= 0; level-- {
 
 		resultSet := &distqueue.DistQueueClosestLast{}
 		h.searchAtLayer(q, resultSet, h.efConstruction, ep, level)
 		switch h.DelaunayType {
 		case 0:
-			// shrink resultSet to M closest elements (the simple heuristic)
+			// shrink resultSet to M the closest elements (the simple heuristic)
 			for resultSet.Len() > h.M {
 				resultSet.Pop()
 			}
@@ -477,7 +476,7 @@ func (h *Hnsw) Add(q Point, id uint32) {
 	}
 
 	h.Lock()
-	// Add it and increase slice length if neccessary
+	// Add it and increase slice length if necessary
 	if len(h.nodes) < int(newID)+1 {
 		h.nodes = h.nodes[0 : newID+1]
 	}
@@ -485,15 +484,15 @@ func (h *Hnsw) Add(q Point, id uint32) {
 	h.Unlock()
 
 	// now add connections to newNode from newNodes neighbours (makes it visible in the graph)
-	for level := min(curlevel, currentMaxLayer); level >= 0; level-- {
+	for level := min(curLevel, curMaxLevel); level >= 0; level-- {
 		for _, n := range newNode.friends[level] {
 			h.Link(n, newID, level)
 		}
 	}
 
 	h.Lock()
-	if curlevel > h.maxLayer {
-		h.maxLayer = curlevel
+	if curLevel > h.maxLevel {
+		h.maxLevel = curLevel
 		h.enterpoint = newID
 	}
 	h.Unlock()
@@ -584,13 +583,13 @@ func (h *Hnsw) Benchmark(q Point, ef int, K int) float64 {
 func (h *Hnsw) Search(q Point, ef int, K int) *distqueue.DistQueueClosestLast {
 
 	h.RLock()
-	currentMaxLayer := h.maxLayer
+	curMaxLevel := h.maxLevel
 	ep := &distqueue.Item{ID: h.enterpoint, D: h.DistFunc(h.nodes[h.enterpoint].p, q)}
 	h.RUnlock()
 
 	resultSet := &distqueue.DistQueueClosestLast{Size: ef + 1}
 	// first pass, find best ep
-	for level := currentMaxLayer; level > 0; level-- {
+	for level := curMaxLevel; level > 0; level-- {
 		changed := true
 		for changed {
 			changed = false
