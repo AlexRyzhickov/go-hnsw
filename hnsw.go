@@ -370,7 +370,8 @@ func New(M int, efConstruction int, first Point) *Hnsw {
 
 	h.bitset = bitsetpool.New()
 
-	h.DistFunc = f32.L2Squared8AVX
+	//h.DistFunc = f32.L2Squared8AVX
+	h.DistFunc = f32.InnerProduct
 
 	// add first point, it will be our enterpoint (index 0)
 	h.nodes = []node{node{level: 0, p: first}}
