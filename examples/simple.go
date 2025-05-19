@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
@@ -18,7 +19,7 @@ func main() {
 	)
 	const (
 		queriesSize = 1000
-		pointsSize  = 1_000_000
+		pointsSize  = 100_000
 	)
 
 	var zero hnsw.Point = make([]float32, 128)
@@ -97,9 +98,15 @@ func main() {
 }
 
 func randomPoint() hnsw.Point {
+	sum := float32(0)
 	var v hnsw.Point = make([]float32, 128)
-	for i := range v {
-		v[i] = rand.Float32()
+	for i := 0; i < len(v); i++ {
+		v[i] = 2*rand.Float32() - 1
+		sum = sum + v[i]*v[i]
+	}
+	norm := float32(math.Sqrt(float64(sum)))
+	for i := 0; i < len(v); i++ {
+		v[i] = v[i] / norm
 	}
 	return v
 }
