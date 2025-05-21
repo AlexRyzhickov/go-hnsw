@@ -11,6 +11,11 @@ import (
 	"go-hnsw/embeddings"
 )
 
+type candidate struct {
+	id    uint32
+	score float32
+}
+
 func main() {
 
 	const (
@@ -43,7 +48,7 @@ func main() {
 	fmt.Printf("Generating queries and calculating true answers using bruteforce search...\n")
 	queries := make([]hnsw.Point, queriesSize)
 
-	gt := make([][]uint32, queriesSize)
+	gt := make([][]candidate, queriesSize)
 	for i := range queries {
 		queries[i] = randomPoint()
 	}
@@ -60,36 +65,29 @@ func main() {
 		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] < dest[indices[j]] })
 		indices = indices[:K]
 		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] > dest[indices[j]] })
-		gt[i] = make([]uint32, K)
+		gt[i] = make([]candidate, K)
 		for k := 0; k < K; k++ {
-			gt[i][k] = indices[k]
+			gt[i][k] = candidate{id: indices[k], score: dest[indices[k]]}
 		}
 	}
 
 	fmt.Printf("Now searching with HNSW...\n")
 
-	recall := float32(0)
+	recall := float64(0)
 	start := time.Now()
 	for i := 0; i < queriesSize; i++ {
 		result := h.Search(queries[i], efSearch, K)
-		hits := 0
-		items := make(map[uint32]struct{})
+		our := make([]candidate, K)
 		for j := 0; j < K; j++ {
 			item := result.Pop()
-			items[item.ID] = struct{}{}
+			our[j] = candidate{id: item.ID, score: item.D}
 		}
-		for j := 0; j < K; j++ {
-			id := gt[i][j]
-			if _, ok := items[id]; ok {
-				hits++
-			}
-		}
-		recall = recall + float32(hits)/float32(K)
+		recall = recall + Recall(gt[i], our)
 	}
 	stop := time.Since(start)
 
 	fmt.Printf("%v queries / second (single thread)\n", 1000.0/stop.Seconds())
-	fmt.Printf("Average 10-NN precision: %v\n", float64(recall)/float64(queriesSize))
+	fmt.Printf("Recall: %v\n", float64(recall)/float64(queriesSize))
 }
 
 func randomPoint() hnsw.Point {
@@ -104,6 +102,25 @@ func randomPoint() hnsw.Point {
 		v[i] = v[i] / norm
 	}
 	return v
+}
+
+func Recall(gt []candidate, items []candidate) float64 {
+	gtMap := make(map[float32]int)
+	for _, item := range gt {
+		gtMap[item.score]++
+	}
+	for _, item := range items {
+		if _, ok := gtMap[item.score]; ok {
+			gtMap[item.score]--
+		}
+	}
+	hits := 0
+	for _, v := range gtMap {
+		if v > 0 {
+			hits += v
+		}
+	}
+	return 1.0 - float64(hits)/float64(len(gt))
 }
 
 //queriesSize = 1000
