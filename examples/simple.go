@@ -46,31 +46,8 @@ func main() {
 	}
 
 	fmt.Printf("Generating queries and calculating true answers using bruteforce search...\n")
-	queries := make([]hnsw.Point, queriesSize)
-
-	gt := make([][]candidate, queriesSize)
-	for i := range queries {
-		queries[i] = randomPoint()
-	}
-	for i := range queries {
-		dest := make([]float32, pointsSize)
-		indices := make([]uint32, pointsSize)
-		for j := 0; j < pointsSize; j++ {
-			indices[j] = uint32(j)
-		}
-		dest = matrix.CalcDistances(dest, queries[i])
-		for j := 0; j < pointsSize; j++ {
-			dest[j] = 1 - dest[j]
-		}
-		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] < dest[indices[j]] })
-		indices = indices[:K]
-		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] > dest[indices[j]] })
-		gt[i] = make([]candidate, K)
-		for k := 0; k < K; k++ {
-			gt[i][k] = candidate{id: indices[k], score: dest[indices[k]]}
-		}
-	}
-
+	queries := generateQueries(queriesSize)
+	gt := generateGT(matrix, queries, pointsSize, queriesSize, K)
 	fmt.Printf("Now searching with HNSW...\n")
 
 	recall := float64(0)
@@ -102,6 +79,37 @@ func randomPoint() hnsw.Point {
 		v[i] = v[i] / norm
 	}
 	return v
+}
+
+func generateQueries(limit int) []hnsw.Point {
+	queries := make([]hnsw.Point, limit)
+	for i := range queries {
+		queries[i] = randomPoint()
+	}
+	return queries
+}
+
+func generateGT(matrix *embeddings.Matrix, queries []hnsw.Point, pointsSize, queriesSize, K int) [][]candidate {
+	gt := make([][]candidate, queriesSize)
+	for i := range queries {
+		dest := make([]float32, pointsSize)
+		indices := make([]uint32, pointsSize)
+		for j := 0; j < pointsSize; j++ {
+			indices[j] = uint32(j)
+		}
+		dest = matrix.CalcDistances(dest, queries[i])
+		for j := 0; j < pointsSize; j++ {
+			dest[j] = 1 - dest[j]
+		}
+		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] < dest[indices[j]] })
+		indices = indices[:K]
+		sort.Slice(indices, func(i, j int) bool { return dest[indices[i]] > dest[indices[j]] })
+		gt[i] = make([]candidate, K)
+		for k := 0; k < K; k++ {
+			gt[i][k] = candidate{id: indices[k], score: dest[indices[k]]}
+		}
+	}
+	return gt
 }
 
 //func Recall(gt []candidate, items []candidate) float64 {
