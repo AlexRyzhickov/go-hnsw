@@ -104,23 +104,38 @@ func randomPoint() hnsw.Point {
 	return v
 }
 
+//func Recall(gt []candidate, items []candidate) float64 {
+//	gtMap := make(map[float32]int)
+//	for _, item := range gt {
+//		gtMap[item.score]++
+//	}
+//	for _, item := range items {
+//		if _, ok := gtMap[item.score]; ok {
+//			gtMap[item.score]--
+//		}
+//	}
+//	hits := 0
+//	for _, v := range gtMap {
+//		if v > 0 {
+//			hits += v
+//		}
+//	}
+//	return 1.0 - float64(hits)/float64(len(gt))
+//}
+
 func Recall(gt []candidate, items []candidate) float64 {
-	gtMap := make(map[float32]int)
+	gtMap := make(map[uint32]struct{})
 	for _, item := range gt {
-		gtMap[item.score]++
-	}
-	for _, item := range items {
-		if _, ok := gtMap[item.score]; ok {
-			gtMap[item.score]--
-		}
+		gtMap[item.id] = struct{}{}
 	}
 	hits := 0
-	for _, v := range gtMap {
-		if v > 0 {
-			hits += v
+	for _, item := range items {
+		if _, ok := gtMap[item.id]; ok {
+			delete(gtMap, item.id)
+			hits++
 		}
 	}
-	return 1.0 - float64(hits)/float64(len(gt))
+	return float64(hits) / float64(len(gt))
 }
 
 //queriesSize = 1000
